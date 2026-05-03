@@ -69,6 +69,32 @@ static int  consoleTail   = 0;
 static int  consoleFilled = 0;
 static int  consoleTotal  = 0;   // 单调递增总行数，用于增量拉取
 
+#define CONSOLE_CMD_QUEUE_SIZE 4
+#define CONSOLE_CMD_LEN 64
+static char consoleCmdQueue[CONSOLE_CMD_QUEUE_SIZE][CONSOLE_CMD_LEN];
+static int  consoleCmdHead  = 0;
+static int  consoleCmdTail  = 0;
+static int  consoleCmdCount = 0;
+
+bool enqueueConsoleCmd(const char* cmd) {
+    if (!cmd || !*cmd) return false;
+    if (consoleCmdCount >= CONSOLE_CMD_QUEUE_SIZE) return false;
+    strncpy(consoleCmdQueue[consoleCmdTail], cmd, CONSOLE_CMD_LEN - 1);
+    consoleCmdQueue[consoleCmdTail][CONSOLE_CMD_LEN - 1] = '\0';
+    consoleCmdTail = (consoleCmdTail + 1) % CONSOLE_CMD_QUEUE_SIZE;
+    consoleCmdCount++;
+    return true;
+}
+
+void processConsoleCommandQueue() {
+    if (consoleCmdCount <= 0) return;
+
+    String cmd = consoleCmdQueue[consoleCmdHead];
+    consoleCmdHead = (consoleCmdHead + 1) % CONSOLE_CMD_QUEUE_SIZE;
+    consoleCmdCount--;
+    doCommand(cmd, false);
+}
+
 void webLog(const char* msg) {
     // 按 \n 拆分写入，避免换行符污染 JSON
     const char* start = msg;
@@ -272,19 +298,28 @@ void setupWebRC() {
 
     webRCServer.on("/console", HTTP_GET, []() {
         int since = -1;
+        int limit = 20;
         if (webRCServer.hasArg("since")) since = webRCServer.arg("since").toInt();
+        if (webRCServer.hasArg("limit")) limit = webRCServer.arg("limit").toInt();
+        if (limit <= 0) limit = 20;
+        if (limit > CONSOLE_LINES) limit = CONSOLE_LINES;
+
+        int availableFrom = max(0, consoleTotal - consoleFilled);
+        int sendFrom = (since >= 0) ? since : availableFrom;
+        if (sendFrom < availableFrom) sendFrom = availableFrom;
+        if (sendFrom > consoleTotal) sendFrom = consoleTotal;
+        int sendTo = min(consoleTotal, sendFrom + limit);
 
         String json = "{\"total\":";
         json += consoleTotal;
+        json += ",\"next\":";
+        json += sendTo;
+        json += ",\"has_more\":";
+        json += (sendTo < consoleTotal) ? "true" : "false";
         json += ",\"lines\":[";
 
-        // 计算实际可返回的起始行号
-        int sendFrom = (since >= 0 && since < consoleTotal)
-                       ? max(since, consoleTotal - consoleFilled)
-                       : consoleTotal - consoleFilled;
-
         bool first = true;
-        for (int i = sendFrom; i < consoleTotal; i++) {
+        for (int i = sendFrom; i < sendTo; i++) {
             int idx = i % CONSOLE_LINES;
             if (!first) json += ",";
             first = false;
@@ -303,13 +338,22 @@ void setupWebRC() {
     webRCServer.on("/console/cmd", HTTP_POST, []() {
         String cmd = webRCServer.arg("plain");
         cmd.trim();
-        if (cmd.length() > 0) {
-            char buf[CONSOLE_LINE_LEN];
-            snprintf(buf, sizeof(buf), "> %s", cmd.c_str());
-            webLog(buf);
-            doCommand(cmd, false);
+        if (cmd.length() == 0) {
+            webRCServer.send(400, "application/json", "{\"ok\":0,\"e\":\"empty command\"}");
+            return;
         }
-        webRCServer.send(200, "application/json", "{\"ok\":1}");
+
+        char buf[CONSOLE_LINE_LEN];
+        snprintf(buf, sizeof(buf), "> %s", cmd.c_str());
+        webLog(buf);
+
+        if (!enqueueConsoleCmd(cmd.c_str())) {
+            webLog("! command queue is full");
+            webRCServer.send(503, "application/json", "{\"ok\":0,\"e\":\"queue full\"}");
+            return;
+        }
+
+        webRCServer.send(200, "application/json", "{\"ok\":1,\"queued\":1}");
     });
 
     webRCServer.on("/console/enable", HTTP_POST, []() {
@@ -358,4 +402,5 @@ void readWebRC() {
 #else
 void setupWebRC() { print("Web RC已禁用\n"); }
 void readWebRC()  {}
+void processConsoleCommandQueue() {}
 #endif

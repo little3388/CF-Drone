@@ -230,6 +230,10 @@ let lastPressedButton = -1; // 最近一次操作的按鈕编号，用于后端�
 let consolePollingTimer = null;
 let consoleLastTotal    = 0;   // 增量拉取游标：已展示到第 N 行
 let consoleFetchInFlight = false; // 防并发：上次 fetch 未返回时跳过本次
+let consolePanelOpen = false;
+const CONSOLE_BASE_POLL_MS = 500;
+const CONSOLE_CATCHUP_POLL_MS = 80;
+const CONSOLE_PAGE_LIMIT = 20;
 
 /*======================== 按钮配置（2×3 六宫格）========================*/
 const buttonConfigs = [
@@ -557,6 +561,7 @@ function toggleConsole() {
   const panel = document.getElementById('console-panel');
   const btn   = document.getElementById('btn-5');
   const open  = panel.style.display === 'none';
+  consolePanelOpen = open;
   panel.style.display = open ? 'flex' : 'none';
   if (open) { panel.style.flexDirection = 'column'; }
   if (btn) { open ? btn.classList.add('active') : btn.classList.remove('active'); }
@@ -564,20 +569,29 @@ function toggleConsole() {
     document.getElementById('console-output').innerHTML = '';
     consoleLastTotal = 0;
     fetch('/console/enable', {method:'POST'}).catch(()=>{});
-    consolePollingTimer = setInterval(fetchConsoleLogs, 500);
     fetchConsoleLogs();
   } else {
     fetch('/console/disable', {method:'POST'}).catch(()=>{});
-    clearInterval(consolePollingTimer);
+    clearTimeout(consolePollingTimer);
     consolePollingTimer = null;
   }
 }
 
+function scheduleConsolePoll(delayMs) {
+  if (!consolePanelOpen) return;
+  clearTimeout(consolePollingTimer);
+  consolePollingTimer = setTimeout(fetchConsoleLogs, delayMs);
+}
+
 function fetchConsoleLogs() {
-  if (consoleFetchInFlight) return;  // 上次未返回则跳过，防止并发重复追加
+  if (!consolePanelOpen) return;
+  if (consoleFetchInFlight) {
+    scheduleConsolePoll(CONSOLE_CATCHUP_POLL_MS);
+    return;
+  }
+
   consoleFetchInFlight = true;
-  fetch('/console?since=' + consoleLastTotal).then(r=>r.json()).then(data => {
-    consoleFetchInFlight = false;
+  fetch('/console?since=' + consoleLastTotal + '&limit=' + CONSOLE_PAGE_LIMIT).then(r=>r.json()).then(data => {
     const out = document.getElementById('console-output');
     if (data.lines && data.lines.length > 0) {
       const frag = document.createDocumentFragment();
@@ -588,11 +602,19 @@ function fetchConsoleLogs() {
       });
       out.appendChild(frag);
       out.scrollTop = out.scrollHeight;
-      consoleLastTotal = data.total;
       // 限制 DOM 行数，避免长时间运行内存泄漏
       while (out.children.length > 200) out.removeChild(out.firstChild);
     }
-  }).catch(()=>{ consoleFetchInFlight = false; });
+
+    if (typeof data.next === 'number') consoleLastTotal = data.next;
+    else if (typeof data.total === 'number') consoleLastTotal = data.total;
+
+    scheduleConsolePoll(data.has_more ? CONSOLE_CATCHUP_POLL_MS : CONSOLE_BASE_POLL_MS);
+  }).catch(()=>{
+    scheduleConsolePoll(CONSOLE_BASE_POLL_MS);
+  }).finally(() => {
+    consoleFetchInFlight = false;
+  });
 }
 
 function sendConsoleCmd() {
@@ -601,10 +623,13 @@ function sendConsoleCmd() {
   if (!cmd) return;
   input.value = '';
   fetch('/console/cmd', {method:'POST', headers:{'Content-Type':'text/plain'}, body:cmd})
-    .then(() => {
+    .then(r => r.json())
+    .then(resp => {
+      if (!resp.ok) {
+        if (resp.e === 'queue full') showToast('⚠️ 命令队列已满，请稍后重试');
+        return;
+      }
       fetchConsoleLogs();
-      setTimeout(fetchConsoleLogs, 300);
-      setTimeout(fetchConsoleLogs, 800);
     }).catch(()=>{});
 }
 

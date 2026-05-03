@@ -49,6 +49,7 @@ void loop() {
 	readRC();
 #if WEB_RC_ENABLED
 	readWebRC();  // 读取Web遥控器输入
+	processConsoleCommandQueue(); // 将网页命令放到主循环执行，避免阻塞HTTP回调
 #endif
 	estimate();
 	updateBatteryVoltage();
