@@ -176,13 +176,11 @@ void setWebRCInput(float roll, float pitch, float yaw, float throttle, uint16_t 
     controlMode     = NAN;
     controlTime     = t;
 
-    static unsigned long lastPrint = 0;
     static float lastPrintedThrottle = -1.0f;
-    if (millis() - lastPrint > 30000 || fabsf(pThrottle - lastPrintedThrottle) > 5.0f) {
+    if (fabsf(pThrottle - lastPrintedThrottle) > 5.0f) {
         print("WebRC T=%.0f%% R=%.1f P=%.1f Y=%.1f Btn=0x%04X\n",
               pThrottle, pRoll, pPitch, pYaw, buttons);
         lastPrintedThrottle = pThrottle;
-        lastPrint = millis();
     }
 }
 
