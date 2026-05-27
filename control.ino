@@ -10,9 +10,10 @@
 #include "control.h"
 #endif
 
+// 默认参数适配118mm轴距的微型四轴飞行器
 // ============== 角速率环（内环）参数 ==============
-#define PITCHRATE_P 0.05 // 增大P值提高响应速度
-#define PITCHRATE_I 0.2 // 中等I值补偿电机差异
+#define PITCHRATE_P 0.06 // 增大P值提高响应速度
+#define PITCHRATE_I 0.1 // 中等I值补偿电机差异
 #define PITCHRATE_D 0.001 // 小D值抑制震荡
 #define PITCHRATE_I_LIM 0.3 // 限制积分积累
 #define ROLLRATE_P PITCHRATE_P // 横滚和俯仰使用相同参数
