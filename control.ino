@@ -10,7 +10,7 @@
 #include "control.h"
 #endif
 
-// 默认参数适配118mm轴距的微型四轴飞行器
+// 参数适配118mm轴距的微型四轴飞行器
 // ============== 角速率环（内环）参数 ==============
 #define PITCHRATE_P 0.06 // 增大P值提高响应速度
 #define PITCHRATE_I 0.1 // 中等I值补偿电机差异
@@ -32,6 +32,30 @@
 #define PITCH_I ROLL_I
 #define PITCH_D ROLL_D
 #define YAW_P 3 // 偏航响应稍慢
+
+// // 参数适配50mm轴距的微型四轴飞行器
+// // ============== 角速率环（内环）参数 ==============
+// #define PITCHRATE_P 0.05 // 增大P值提高响应速度
+// #define PITCHRATE_I 0.05 // 中等I值补偿电机差异
+// #define PITCHRATE_D 0.001 // 小D值抑制震荡
+// #define PITCHRATE_I_LIM 0.08 // 限制积分积累
+// #define ROLLRATE_P PITCHRATE_P // 横滚和俯仰使用相同参数
+// #define ROLLRATE_I PITCHRATE_I 
+// #define ROLLRATE_D PITCHRATE_D
+// #define ROLLRATE_I_LIM PITCHRATE_I_LIM
+// #define YAWRATE_P 0.3 // 偏航需要更高的P值（惯性较小）
+// #define YAWRATE_I 0.01 // 中等I值补偿
+// #define YAWRATE_D 0.01 // 小D值
+// #define YAWRATE_I_LIM 0.3
+// // ============== 角度环（外环）参数 ==============
+// #define ROLL_P 3 // 较高的P值快速响应
+// #define ROLL_I 0 // 角度环通常不需要I项
+// #define ROLL_D 0 // 角度环通常不需要D项
+// #define PITCH_P ROLL_P // 横滚和俯仰相同
+// #define PITCH_I ROLL_I
+// #define PITCH_D ROLL_D
+// #define YAW_P 3 // 偏航响应稍慢
+
 // ============== 限制值 ==============
 #define PITCHRATE_MAX radians(360) // 高转速限制（1000°/s）
 #define ROLLRATE_MAX radians(360)
@@ -42,7 +66,7 @@
 #define RATES_D_LPF_ALPHA 0.2 // cutoff frequency ~ 40 Hz
 
 float motThrMin = 0.10f;  // 推力下限（摇杆最低位的输出），可通过参数 MOT_THR_MIN 调节
-float motThrMax = 1.0f;   // 推力上限（摇杆最高位的输出），可通过参数 MOT_THR_MAX 调节
+float motThrMax = 0.9f;   // 推力上限（摇杆最高位的输出），可通过参数 MOT_THR_MAX 调节；保留 10% 余量供姿态修正
 
 const int RAW = 0, ACRO = 1, STAB = 2, ALTHOLD = 3, AUTO = 4; // flight modes
 int mode = STAB;
@@ -201,13 +225,24 @@ void controlTorque() {
 }
 
 void desaturate(float& a, float& b, float& c, float& d) {
-	float maxThrust = max(max(a, b), max(c, d));
-	if (maxThrust > 1) {
-		float diff = maxThrust - 1;
-		a -= diff;
-		b -= diff;
-		c -= diff;
-		d -= diff;
+	// avg ≈ thrustTarget（力矩分量之和为零），保持 avg 不变，等比缩减力矩偏差
+	float avg = (a + b + c + d) * 0.25f;
+	float maxVal = max(max(a, b), max(c, d));
+	float minVal = min(min(a, b), min(c, d));
+
+	float scale = 1.0f;
+	if (maxVal > 1.0f && maxVal > avg) {
+		scale = min(scale, (1.0f - avg) / (maxVal - avg));
+	}
+	if (minVal < 0.0f && avg > minVal) {
+		scale = min(scale, avg / (avg - minVal));
+	}
+
+	if (scale < 1.0f) {
+		a = avg + (a - avg) * scale;
+		b = avg + (b - avg) * scale;
+		c = avg + (c - avg) * scale;
+		d = avg + (d - avg) * scale;
 	}
 }
 
