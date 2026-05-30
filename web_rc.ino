@@ -59,7 +59,12 @@ static float lastValidYaw      = 0.0f;     // 上次通过验证的偏航值
 static unsigned long lastDataErrorTime = 0; // 上次数据异常时间，用于限速错误日志输出
 
 // ==================== Web 服务器 ====================
-WebServer webRCServer(8080);
+WebServer webRCServer(80);          // 主服务器：80端口（标准HTTP，无需在URL中写端口）
+
+// ------旧PCB印刷地址访问 :8080 → 301跳转到80端口；旧地址全部淘汰后可删除------------
+// 8080端口兼容重定向：堆指针，setupWebRC()中动态构造，BSS仅占4字节
+static WiFiServer* redirectServer8080 = nullptr;
+// ------旧PCB印刷地址访问 :8080 → 301跳转到80端口；旧地址全部淘汰后可删除------------
 
 // ==================== 控制台日志缓冲区 ====================
 #define CONSOLE_LINES    50
@@ -282,6 +287,47 @@ bool isUsingWebRC() {
     return useWebRC && isWebRCEnabled();
 }
 
+// ------旧PCB印刷地址访问 :8080 → 301跳转到80端口；旧地址全部淘汰后可删除------------
+// 兼容旧遥控端口，处理8080端口的301重定向请求（WiFiServer原始TCP，手动解析HTTP）
+static void handleRedirect8080() {
+    if (!redirectServer8080) return;
+    WiFiClient client = redirectServer8080->accept();
+    if (!client) return;
+
+    String path = "/";
+    String host = "";
+    unsigned long t0 = millis();
+    while (!client.available() && millis() - t0 < 200) {}
+
+    if (client.available()) {
+        // 解析请求行：GET /path HTTP/1.1
+        String reqLine = client.readStringUntil('\n');
+        int s1 = reqLine.indexOf(' ');
+        int s2 = reqLine.indexOf(' ', s1 + 1);
+        if (s1 >= 0 && s2 > s1) path = reqLine.substring(s1 + 1, s2);
+
+        // 读取请求头，提取Host（去掉 :8080 端口部分）
+        while (client.available()) {
+            String line = client.readStringUntil('\n');
+            line.trim();
+            if (line.length() == 0) break;
+            if (line.startsWith("Host:") || line.startsWith("host:")) {
+                host = line.substring(5);
+                host.trim();
+                int colon = host.indexOf(':');
+                if (colon >= 0) host = host.substring(0, colon);
+            }
+        }
+    }
+
+    client.print("HTTP/1.1 301 Moved Permanently\r\nLocation: http://");
+    client.print(host);
+    client.print(path);
+    client.print("\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+    client.stop();
+}
+// ------旧PCB印刷地址访问 :8080 → 301跳转到80端口；旧地址全部淘汰后可删除------------
+
 // ==================== 主设置函数 ====================
 
 void setupWebRC() {
@@ -380,7 +426,13 @@ void setupWebRC() {
     });
 
     webRCServer.begin();
-    print("✓ Web RC 已启动: http://192.168.4.1:8080\n");
+
+    // ------旧PCB印刷地址访问 :8080 → 301跳转到80端口；旧地址全部淘汰后可删除------------
+    redirectServer8080 = new WiFiServer(8080); // 堆构造，不占BSS
+    redirectServer8080->begin(); // 8080端口轻量重定向（WiFiServer），兼容旧PCB印刷地址
+    // ------旧PCB印刷地址访问 :8080 → 301跳转到80端口；旧地址全部淘汰后可删除------------
+
+    print("✓ Web RC 已启动: http://192.168.4.1\n");
     print("  死区 摇杆=%.0f%% 油门=%.0f%% | 缩放 摇杆=%.2f 偏航=%.2f\n",
           stickDeadzone * 100.0f, throttleDeadzone * 100.0f,
           webRCStickScale, webRCYawScale);
@@ -390,6 +442,11 @@ void setupWebRC() {
 
 void readWebRC() {
     webRCServer.handleClient();
+
+    // ------旧PCB印刷地址访问 :8080 → 301跳转到80端口；旧地址全部淘汰后可删除------------
+    handleRedirect8080(); // 处理8080重定向，兼容旧PCB访问
+    // ------旧PCB印刷地址访问 :8080 → 301跳转到80端口；旧地址全部淘汰后可删除------------
+    
     if (isWebRCEnabled()) {
         webRCEnabled = useWebRC = true;
     } else {
