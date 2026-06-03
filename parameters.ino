@@ -20,6 +20,9 @@ extern Vector accBias, accScale;
 extern Vector imuRotation;
 extern LowPassFilter<Vector> gyroBiasFilter;
 extern int rcRxPin;
+extern int rcProtocol;   // 遥控协议：0=SBUS, 1=CRSF(ELRS)
+extern int rcTxPin;      // 遥测回传 TX 引脚，-1=不启用
+extern int rcBaud;       // 串口波特率
 extern float trimRoll, trimPitch;         // 软件配平参数，定义于 control.ino
 extern float levelGateThreshold;         // 摇杆门控阈值，定义于 estimate.ino
 
@@ -115,7 +118,10 @@ Parameter parameters[] = {
 	{"RC_THROTTLE", &throttleChannel},
 	{"RC_YAW", &yawChannel},
 	{"RC_MODE", &modeChannel},
-	{"RC_RX_PIN", &rcRxPin},
+	{"RC_RX_PIN",    &rcRxPin},
+	{"RC_PROTOCOL",  &rcProtocol},   // 0=SBUS, 1=CRSF(ELRS)
+	{"RC_TX_PIN",    &rcTxPin},      // 遥测回传引脚，-1=不启用
+	{"RC_BAUD",      &rcBaud},       // 串口波特率
 	// wifi
 	{"WIFI_MODE", &wifiMode},
 	{"WIFI_LOC_PORT", &udpLocalPort},

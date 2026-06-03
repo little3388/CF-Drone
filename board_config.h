@@ -16,10 +16,13 @@
 // 启动后 Strapping 采样完成，analogRead() 调用时引脚为正常输入态
 #define BOARD_VBAT_ADC_PIN 2               // ADC1_CH2（GPIO2）
 
-// ---- RC 串口（SBUS）----
-// GPIO9 有板载 I2C SCL 上拉 + Boot 内置上拉，作为 SBUS RX 输入时 SBUS 空闲高电平与上拉一致
+// ---- RC 串口（CRSF/ELRS 默认；SBUS 可通过参数 RC_PROTOCOL=0 切换）----
+// GPIO9 作 CRSF RX，标准电平，无需反相器
 #define BOARD_RC_SERIAL    Serial1
 #define BOARD_RC_RX_PIN    9
+#define BOARD_RC_TX_PIN    -1          // 遥测回传预留，-1=暂不启用
+#define BOARD_RC_PROTOCOL  1           // 0=SBUS, 1=CRSF(ELRS)
+#define BOARD_RC_BAUD      420000      // CRSF 标准波特率默认420000；SBUS为100000
 
 // ---- IMU SPI（使用文档 / Arduino pins_arduino.h 默认引脚）----
 // 与 Arduino ESP32-C3 库 SPI 默认定义完全一致，SPI.begin() 可无参调用
@@ -42,9 +45,12 @@
 // ---- 电池 ADC：GPIO1（ADC1_CH0，S3 的 ADC1 范围为 GPIO1-10）----
 #define BOARD_VBAT_ADC_PIN 1
 
-// ---- RC 串口（SBUS）：GPIO8，与 FSPI/UART0 无冲突 ----
+// ---- RC 串口（CRSF/ELRS 默认）：GPIO8，与 FSPI/UART0 无冲突 ----
 #define BOARD_RC_SERIAL    Serial2
 #define BOARD_RC_RX_PIN    8
+#define BOARD_RC_TX_PIN    -1
+#define BOARD_RC_PROTOCOL  1
+#define BOARD_RC_BAUD      420000
 
 // ---- IMU SPI：使用 ESP32-S3 FSPI 默认管脚 ----
 // SCK=12（默认），MISO=13（默认），MOSI=11（默认），CS=10（默认 SS）
@@ -63,8 +69,11 @@
 
 #define BOARD_MOTOR_PINS   {12, 13, 15, 14}  // 电机引脚 RL=GPIO12, RR=GPIO13, FR=GPIO15, FL=GPIO14
 #define BOARD_VBAT_ADC_PIN 36              // 电池电压 ADC 引脚（GPIO36，仅输入）
-#define BOARD_RC_SERIAL    Serial2         // SBUS 使用的串口
-#define BOARD_RC_RX_PIN    4               // SBUS RX 引脚（GPIO4）
+#define BOARD_RC_SERIAL    Serial2         // RC 串口（CRSF/ELRS 默认）
+#define BOARD_RC_RX_PIN    4               // RC RX 引脚（GPIO4）
+#define BOARD_RC_TX_PIN    -1              // 遥测回传预留，-1=暂不启用
+#define BOARD_RC_PROTOCOL  1               // 0=SBUS, 1=CRSF(ELRS)
+#define BOARD_RC_BAUD      420000          // CRSF 标准波特率默认420000；SBUS为100000
 #define BOARD_SPI_SCK      18              // SPI 时钟（GPIO18）
 #define BOARD_SPI_MISO     19              // SPI 主入从出（GPIO19）
 #define BOARD_SPI_MOSI     23              // SPI 主出从入（GPIO23）
