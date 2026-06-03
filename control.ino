@@ -38,7 +38,7 @@
 // #define PITCHRATE_P 0.05 // 增大P值提高响应速度
 // #define PITCHRATE_I 0.05 // 中等I值补偿电机差异
 // #define PITCHRATE_D 0.001 // 小D值抑制震荡
-// #define PITCHRATE_I_LIM 0.08 // 限制积分积累
+// #define PITCHRATE_I_LIM 0.2 // 限制积分积累
 // #define ROLLRATE_P PITCHRATE_P // 横滚和俯仰使用相同参数
 // #define ROLLRATE_I PITCHRATE_I 
 // #define ROLLRATE_D PITCHRATE_D
