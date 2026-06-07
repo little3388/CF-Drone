@@ -30,6 +30,10 @@ extern float t;
 extern float batteryVoltage;  // battery.ino
 extern Quaternion attitudeTarget;
 extern Quaternion attitude;
+extern Vector ratesExtra;      // control.ino
+extern PID rollRatePID, pitchRatePID, yawRatePID;  // control.ino
+extern PID rollPID, pitchPID, yawPID;              // control.ino
+extern float motThrMin;        // control.ino
 
 void failsafe() {
 	rcLossFailsafe();
@@ -55,8 +59,25 @@ void rcLossFailsafe() {
 
 // Smooth descend on RC lost
 void descend() {
-	mode = AUTO;
-	attitudeTarget = Quaternion();
+	if (mode != AUTO) {
+		// 首次进入：保持当前偏航（仅强制机体水平），清零速率前馈，重置PID积分
+		float currentYaw = attitude.getYaw();
+		attitudeTarget = Quaternion::fromEuler(Vector(0, 0, currentYaw));
+		ratesExtra = Vector(0, 0, 0);
+		rollRatePID.reset();
+		pitchRatePID.reset();
+		yawRatePID.reset();
+		rollPID.reset();
+		pitchPID.reset();
+		yawPID.reset();
+		// 钳制推力上限至悬停推力，避免高油门触发时降落时间过长
+		if (thrustTarget > ALTHOLD_HOVER_THRUST) thrustTarget = ALTHOLD_HOVER_THRUST;
+		mode = AUTO;
+	}
+	// 每帧跟随实际偏航，防止偏航PID在降落过程中重新累积误差
+	float currentYaw = attitude.getYaw();
+	attitudeTarget = Quaternion::fromEuler(Vector(0, 0, currentYaw));
+
 	thrustTarget -= dt / descendTime;
 	if (thrustTarget < 0) {
 		thrustTarget = 0;
