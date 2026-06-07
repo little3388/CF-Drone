@@ -26,11 +26,13 @@
 #define YAWRATE_I_LIM 0.3
 // ============== 角度环（外环）参数 ==============
 #define ROLL_P 6 // 较高的P值快速响应
-#define ROLL_I 0 // 角度环通常不需要I项
+#define ROLL_I 0 // 外环 I 项
 #define ROLL_D 0 // 角度环通常不需要D项
+#define ROLL_I_LIM radians(5.0f) // 外环横滚积分限幅（rad/s），约 5°/s，防止低油门/切模式时积分发散
 #define PITCH_P ROLL_P // 横滚和俯仰相同
 #define PITCH_I ROLL_I
 #define PITCH_D ROLL_D
+#define PITCH_I_LIM ROLL_I_LIM
 #define YAW_P 3 // 偏航响应稍慢
 
 // // 参数适配50mm轴距的微型四轴飞行器
@@ -51,9 +53,11 @@
 // #define ROLL_P 3 // 较高的P值快速响应
 // #define ROLL_I 0 // 角度环通常不需要I项
 // #define ROLL_D 0 // 角度环通常不需要D项
+// #define ROLL_I_LIM radians(5.0f) // 外环横滚积分限幅（rad/s），约 5°/s，防止低油门/切模式时积分发散
 // #define PITCH_P ROLL_P // 横滚和俯仰相同
 // #define PITCH_I ROLL_I
 // #define PITCH_D ROLL_D
+// #define PITCH_I_LIM ROLL_I_LIM
 // #define YAW_P 3 // 偏航响应稍慢
 
 // ============== 限制值 ==============
@@ -80,8 +84,8 @@ extern uint16_t webRCButtons;
 PID rollRatePID(ROLLRATE_P, ROLLRATE_I, ROLLRATE_D, ROLLRATE_I_LIM, RATES_D_LPF_ALPHA);
 PID pitchRatePID(PITCHRATE_P, PITCHRATE_I, PITCHRATE_D, PITCHRATE_I_LIM, RATES_D_LPF_ALPHA);
 PID yawRatePID(YAWRATE_P, YAWRATE_I, YAWRATE_D);
-PID rollPID(ROLL_P, ROLL_I, ROLL_D);
-PID pitchPID(PITCH_P, PITCH_I, PITCH_D);
+PID rollPID(ROLL_P, ROLL_I, ROLL_D, ROLL_I_LIM);
+PID pitchPID(PITCH_P, PITCH_I, PITCH_D, PITCH_I_LIM);
 PID yawPID(YAW_P, 0, 0);
 Vector maxRate(ROLLRATE_MAX, PITCHRATE_MAX, YAWRATE_MAX);
 float tiltMax = TILT_MAX;
@@ -102,10 +106,10 @@ float thrustTarget;
 //   参数自动存储到 Flash，断电后继续生效。
 //
 // 漂移方向与参数对照（松杆后观察）：
-//   飞机向左漂 → p CTL_TRIM_ROLL  -0.01  （负值）
-//   飞机向右漂 → p CTL_TRIM_ROLL  +0.01  （正值）
-//   飞机向前漂 → p CTL_TRIM_PITCH -0.01  （负值）
-//   飞机向后漂 → p CTL_TRIM_PITCH +0.01  （正值）
+//   飞机向左漂 → p CTL_TRIM_ROLL  +0.01  （正值，命令右倾以产生向右分力抵消左漂）
+//   飞机向右漂 → p CTL_TRIM_ROLL  -0.01  （负值，命令左倾以产生向左分力抵消右漂）
+//   飞机向前漂 → p CTL_TRIM_PITCH -0.01  （负值，命令抬头以产生向后分力抵消前漂）
+//   飞机向后漂 → p CTL_TRIM_PITCH +0.01  （正值，命令低头以产生向前分力抵消后漂）
 //
 // 注意：电量变化、负载改变后配平值可能略有偏移，需偶尔重调。
 float trimRoll  = 0.0f; // 横滚配平角（rad），参数名：CTL_TRIM_ROLL

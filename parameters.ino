@@ -25,6 +25,8 @@ extern int rcTxPin;      // 遥测回传 TX 引脚，-1=不启用
 extern int rcBaud;       // 串口波特率
 extern float trimRoll, trimPitch;         // 软件配平参数，定义于 control.ino
 extern float levelGateThreshold;         // 摇杆门控阈值，定义于 estimate.ino
+extern float levelBiasGain;              // Mahony I 项增益，定义于 estimate.ino
+extern Vector levelGyroBias;             // Mahony 虚拟陀螺偏置，定义于 estimate.ino
 
 Preferences storage;
 
@@ -61,14 +63,16 @@ Parameter parameters[] = {
 
 	// ===== 控制（角度外环 PID）=====
 	// 角度环将目标姿态角误差转换为角速率指令，输出给内环。
-	// 通常角度环只需 P 项即可，I/D 一般设为 0。
-	{"CTL_R_P", &rollPID.p},   // 横滚角度 P 增益（角度误差 rad → 角速率指令 rad/s）
-	{"CTL_R_I", &rollPID.i},   // 横滚角度 I 增益（一般为 0）
-	{"CTL_R_D", &rollPID.d},   // 横滚角度 D 增益（一般为 0）
-	{"CTL_P_P", &pitchPID.p},  // 俯仰角度 P 增益
-	{"CTL_P_I", &pitchPID.i},  // 俯仰角度 I 增益（一般为 0）
-	{"CTL_P_D", &pitchPID.d},  // 俯仰角度 D 增益（一般为 0）
-	{"CTL_Y_P", &yawPID.p},    // 偏航角度 P 增益
+	// I 项用于自动补偿物理不对称引起的固定悬停偏差，需同时配置 WU 积分限幅才能生效。
+	{"CTL_R_P",  &rollPID.p},      // 横滚角度 P 增益（角度误差 rad → 角速率指令 rad/s）
+	{"CTL_R_I",  &rollPID.i},      // 横滚角度 I 增益，用于补偿物理不对称固定偏差（默认 0.5）
+	{"CTL_R_D",  &rollPID.d},      // 横滚角度 D 增益（一般为 0）
+	{"CTL_R_WU", &rollPID.windup}, // 横滚角度积分限幅（rad/s），I 项非 0 时必须配置，防止积分发散
+	{"CTL_P_P",  &pitchPID.p},     // 俯仰角度 P 增益
+	{"CTL_P_I",  &pitchPID.i},     // 俯仰角度 I 增益（默认 0.5）
+	{"CTL_P_D",  &pitchPID.d},     // 俯仰角度 D 增益（一般为 0）
+	{"CTL_P_WU", &pitchPID.windup},// 俯仰角度积分限幅（rad/s）
+	{"CTL_Y_P",  &yawPID.p},       // 偏航角度 P 增益
 
 	// ===== 控制（限制值）=====
 	{"CTL_P_RATE_MAX", &maxRate.y}, // 俯仰最大角速率限制（rad/s），超出摇杆指令会被截断
@@ -114,6 +118,7 @@ Parameter parameters[] = {
 	{"EST_ACC_WEIGHT",   &accWeight},          // 加速度计对姿态的修正权重（0~1），越大修正越强，但对振动越敏感
 	{"EST_RATES_LPF_A",  &ratesFilter.alpha},  // 角速率低通滤波器系数 alpha（0~1），越小截止频率越低（约 40Hz@0.2）
 	{"EST_LVL_GATE_THR", &levelGateThreshold}, // 摇杆门控阈值（0~1），摇杆偏转超过此比例时 applyLevel 权重渐变为零，防止打杆后松杆漂移
+	{"EST_LVL_BIAS_GAIN",&levelBiasGain},      // Mahony I 项增益：重力误差积分进虚拟陀螺偏置的速率，越大收敛越快（约 30s@0.00002）
 
 	// ===== 电机（引脚配置）=====
 	// 修改后立即调用 setupMotors() 重新初始化 LEDC 通道，无需重启。
