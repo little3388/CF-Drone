@@ -7,7 +7,7 @@
 #ifdef CONFIG_IDF_TARGET_ESP32
 #include <soc/soc.h>
 #include <soc/rtc_cntl_reg.h>
-#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#elif defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3)
 #include "esp_private/brownout.h"
 #endif
 
@@ -41,10 +41,9 @@ float wrapAngle(float angle) {
 void disableBrownOut() {
 #ifdef CONFIG_IDF_TARGET_ESP32
 	REG_CLR_BIT(RTC_CNTL_BROWN_OUT_REG, RTC_CNTL_BROWN_OUT_ENA);
-#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#elif defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3)
 	esp_brownout_disable();
 #endif
-	// ESP32-C3 欠压复位阈值通过 menuconfig 配置，无需代码操作
 }
 
 // Trim and split string by spaces

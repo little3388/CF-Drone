@@ -22,6 +22,13 @@ bool landed; // are we landed and stationary
 
 void setup() {
 	Serial.begin(115200);
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+	// ESP32-C3 使用内置 USB-CDC：Serial.begin() 立即返回，但 USB 枚举需约 1-2 秒。
+	// 若不等待，setup() 前半段的所有打印在主机打开串口前已发出，用户看不到。
+	// 最多等 3 秒：有串口监视器时立即继续；烧录后脱机运行时 3 秒后也会继续。
+	{ unsigned long _t0 = millis(); while (!Serial && millis() - _t0 < 3000) delay(10); }
+	delay(100); // 额外缓冲，确保主机接收缓冲区就绪
+#endif
 	print("程序初始化！\n");
 	disableBrownOut();
 	setupParameters();
@@ -38,9 +45,7 @@ void setup() {
 	setupRC();
 	setLED(false);
 	print("初始化完成！\n");
-#if WEB_RC_ENABLED
-	print("Web RC地址: http://192.168.4.1:8080\n");
-#endif
+// Web RC 启动地址已由 setupWebRC() 内部打印（端口80），此处不再重复
 }
 
 void loop() {

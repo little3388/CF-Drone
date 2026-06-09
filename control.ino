@@ -50,7 +50,7 @@
 // #define YAWRATE_D 0.01 // 小D值
 // #define YAWRATE_I_LIM 0.3
 // // ============== 角度环（外环）参数 ==============
-// #define ROLL_P 3 // 较高的P值快速响应
+// #define ROLL_P 1 // 较高的P值快速响应
 // #define ROLL_I 0 // 角度环通常不需要I项
 // #define ROLL_D 0 // 角度环通常不需要D项
 // #define ROLL_I_LIM radians(5.0f) // 外环横滚积分限幅（rad/s），约 5°/s，防止低油门/切模式时积分发散
