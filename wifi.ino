@@ -19,6 +19,7 @@ WiFiUDP udp;
 
 void setupWiFi() {
 	print("Setup Wi-Fi\n");
+	WiFi.setSleep(false); // disable power save - must be set before softAP/begin
 	if (wifiMode == W_AP) {
 		WiFi.softAP(
 			storage.getString("WIFI_AP_SSID", "Drone_WiFi").c_str(),
@@ -30,7 +31,6 @@ void setupWiFi() {
 			storage.getString("WIFI_STA_PASS", "").c_str()
 		);
 	}
-	WiFi.setSleep(false); // disable power save
 	udp.begin(udpLocalPort);
 }
 
