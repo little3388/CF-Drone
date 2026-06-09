@@ -10,6 +10,25 @@
 
 MPU9250 imu(SPI, BOARD_SPI_CS);
 
+// IMU 超时等待：用 FreeRTOS 定时器替代库内部的 portMAX_DELAY 阻塞
+// 1kHz IMU 正常间隔 1ms，50ms 超时 = 允许连续丢 50 帧后主循环继续运行
+// 避免 IMU 硬件故障（SPI 短路/断路）时主循环死锁导致 HTTP/WiFi 服务无响应
+static bool imuWaitWithTimeout() {
+#ifdef ESP32
+	// 借用 FreeRTOS delay 实现：先让出 CPU 一帧（让 WiFi 任务运行），
+	// 再轮询 IMU 是否就绪，最长等 50ms
+	unsigned long deadline = millis() + 50;
+	while (millis() < deadline) {
+		if (imu.read()) return true;
+		taskYIELD(); // 让出 CPU，给 WiFi/TCP 任务一个调度机会
+	}
+	return false; // 超时，跳过本帧
+#else
+	imu.waitForData();
+	return true;
+#endif
+}
+
 // IMU 安装方向（欧拉角，单位 rad）。默认值 (0, 0, -PI/2) 对应本 PCB 的安装方式：
 // 芯片正面朝上，X 丝印→飞行器右侧，Y 丝印→飞行器前方 → 转换公式 Vector(data.y, -data.x, data.z)
 // 如需适配其他安装方向，修改此值并执行 `preset` 重置参数存储。
@@ -36,7 +55,7 @@ void configureIMU() {
 }
 
 void readIMU() {
-	imu.waitForData();
+	if (!imuWaitWithTimeout()) return; // IMU 超时，跳过本帧
 	imu.getGyro(gyro.x, gyro.y, gyro.z);
 	imu.getAccel(acc.x, acc.y, acc.z);
 	calibrateGyroOnce();
