@@ -123,7 +123,9 @@ void doCommand(String str, bool echo = false) {
 		printIMUCalibration();
 		print("landed: %d\n", landed);
 	} else if (command == "arm") {
-		armed = true;
+		extern bool imuOK;
+		if (!imuOK) { print("IMU故障，禁止解锁！\n"); }
+		else armed = true;
 	} else if (command == "disarm") {
 		armed = false;
 	} else if (command == "raw") {

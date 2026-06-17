@@ -141,9 +141,19 @@ void interpretControls() {
 #if WEB_RC_ENABLED
 	if (!isUsingWebRC()) { // SBUS手势解锁仅当WebRC未活跃时生效
 #endif
-	static bool armWarnNotified = false;  // 防刷屏：低电禁止解锁提示
+	extern bool imuOK;
+	static bool armWarnNotified = false;  // 防刷屏：低电/IMU故障禁止解锁提示
 	if (controlThrottle < 0.05 && controlYaw > 0.95) { // arm gesture
-		if (batteryVoltage > VBAT_ABSENT_THRESHOLD && batteryVoltage < VBAT_WARN_THRESHOLD) {
+		if (!imuOK) {
+			// IMU 故障：禁止解锁
+			if (!armWarnNotified) {
+				print("IMU故障，禁止解锁！\n");
+#if WEB_RC_ENABLED
+				setWebRCWarn("IMU故障 禁止解锁");
+#endif
+				armWarnNotified = true;
+			}
+		} else if (batteryVoltage > VBAT_ABSENT_THRESHOLD && batteryVoltage < VBAT_WARN_THRESHOLD) {
 			// L1 及以下：禁止解锁，状态变化时提示
 			if (!armWarnNotified) {
 				print("电量低(%.2fV)，禁止解锁\n", batteryVoltage);
@@ -156,7 +166,7 @@ void interpretControls() {
 			}
 		} else {
 			armed = true;
-			armWarnNotified = false; // 换新电池后重置
+			armWarnNotified = false; // 解锁成功后重置
 		}
 	}
 	if (controlThrottle < 0.05 && controlYaw < -0.95) armed = false; // disarm gesture
@@ -301,7 +311,10 @@ void interpretWebRC() {
 
 	// 按鈕。0：解锁（上升沿）
 	if (risingEdge & 0x0001) {
-		if (controlThrottle < ARM_THROTTLE_LIMIT) {
+		extern bool imuOK;
+		if (!imuOK) {
+			setWebRCWarn("IMU故障 禁止解锁");
+		} else if (controlThrottle < ARM_THROTTLE_LIMIT) {
 			armed = true;
 		} else {
 			setWebRCWarn("油门过高，无法解锁");
