@@ -315,6 +315,11 @@ void interpretWebRC() {
 		extern char webRCWarnMsg[];
 		if (!imuOK) {
 			setWebRCWarn("IMU故障 禁止解锁");
+		} else if (batteryVoltage > VBAT_ABSENT_THRESHOLD && batteryVoltage < VBAT_WARN_THRESHOLD) {
+			// 低电量：禁止解锁（与 SBUS 路径 interpretControls() 对齐）
+			char warnBuf[64];
+			snprintf(warnBuf, sizeof(warnBuf), "电量低(%.2fV) 禁止解锁", batteryVoltage);
+			setWebRCWarn(warnBuf);
 		} else if (controlThrottle > ARM_THROTTLE_LIMIT) {
 			setWebRCWarn("油门过高，无法解锁");
 		} else {

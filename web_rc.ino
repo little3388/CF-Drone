@@ -272,9 +272,11 @@ void handleWebRCRequest() {
     String body = webRCServer.arg("plain");
     if (handleJSONProtocol(body)) {
         char resp[320];
-        // warn 仅在按钮事件响应中携带并清除；摇杆/心跳包不消费 warn，
-        // 避免摇杆包抢在 state=0 响应之前把 warn 清掉
-        bool deliverWarn = (lastProcType == 2) && webRCWarnMsg[0];
+        // warn 在按钮事件（rt=2）和心跳包（rt=4）响应中携带并清除：
+        //   rt=2：用户主动操作（解锁被拒等），需要即时反馈
+        //   rt=4：系统自动触发（低电自动上锁等），心跳周期≈2s，延迟可接受
+        // 摇杆包（rt=1）不消费 warn，避免摇杆包抢在 state=0 响应之前把 warn 清掉
+        bool deliverWarn = (lastProcType == 2 || lastProcType == 4) && webRCWarnMsg[0];
         if (deliverWarn) {
             if (lastProcButtonIdx >= 0) {
                 snprintf(resp, sizeof(resp),

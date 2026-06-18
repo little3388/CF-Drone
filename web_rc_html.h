@@ -451,8 +451,7 @@ function sendToESP(url, data) {
         el.style.color = resp.arm ? '#00ff88' : '#ff6666';
       }
 
-      // 按钮松开确认 toast：仅当响应来自按钮事件（rt=2）且为松开（bs=0）时触发
-      // 通过后端 rt/bi/bs 字段判断，彻底消除 lastPressedButton 的响应顺序竞态
+      // 按钮松开确认 toast（rt=2, bs=0）
       if (resp.rt === 2 && resp.bs === 0) {
         if (!resp.warn) {
           if (resp.bi === 0)
@@ -462,9 +461,10 @@ function sendToESP(url, data) {
           else if (resp.bi === 2)
             showToast('🛑 电机已停止');
         }
-        // 后端警告——最后处理，保证覆盖前面的 toast
         if (resp.warn) showToast('⚠️ ' + resp.warn);
       }
+      // 心跳包携带的系统警告（低电自动上锁等），不与按钮 toast 冲突
+      if (resp.rt === 4 && resp.warn) showToast('⚠️ ' + resp.warn);
     })
     .catch(() => {
       if (++consecutiveFails >= 3) updateConnectionStatus(false);
