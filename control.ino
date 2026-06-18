@@ -315,11 +315,11 @@ void interpretWebRC() {
 		extern char webRCWarnMsg[];
 		if (!imuOK) {
 			setWebRCWarn("IMU故障 禁止解锁");
-		} else if (controlThrottle < ARM_THROTTLE_LIMIT) {
+		} else if (controlThrottle > ARM_THROTTLE_LIMIT) {
+			setWebRCWarn("油门过高，无法解锁");
+		} else {
 			armed = true;
 			webRCWarnMsg[0] = '\0'; // 解锁成功，清除上次遗留的警告
-		} else {
-			setWebRCWarn("油门过高，无法解锁");
 		}
 	}
 
